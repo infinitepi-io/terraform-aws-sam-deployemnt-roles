@@ -17,6 +17,7 @@ main:
 	@echo "destroy   : Destroy all resources"
 	@echo "full-test : Applies and destroys all resources"
 	@echo "unit-test : Purely local full syntax validation"
+	@echo "docs      : Creates/Updates the module documentation"
 	@true
 
 clean:
@@ -30,19 +31,25 @@ clean:
 #   can have a proxy running and potentially in env vars, and
 #   terraform init can download providers skipping the HTTP proxy.
 #
+# Quick explanation
+# - we print the version so it's clear which one is being used
+# - reformat all terraform files (key thing people are not doing)
+# - turn off the proxies for init so providers download
+# - validate & plan
+#
 
 plan: clean
 	@terraform version \
+		&& terraform fmt --recursive \
 		&& cd "examples/simple-usage" \
-		&& terraform fmt --check \
 		&& HTTP_PROXY='' HTTPS_PROXY='' terraform init \
 		&& terraform validate \
 		&& terraform plan
 
 unit-test: clean
 	@terraform version \
+		&& terraform fmt --recursive \
 		&& cd "examples/simple-usage" \
-		&& terraform fmt --check \
 		&& HTTP_PROXY='' HTTPS_PROXY='' terraform init \
 		&& terraform validate
 
@@ -71,6 +78,15 @@ action:
 		|| echo -e "\n:: NOTE: If act failed due to private repo issues, TF_TESTABLE_MODULE_SSH_KEY needs to be set per README."
 
 docs:
-	docker run --rm --volume "$(CURDIR):/terraform-docs" quay.io/terraform-docs/terraform-docs:0.16.0 markdown terraform-docs --anchor=false --indent 2 --output-file docs/README.md
+	# we need to make sure  a file exists, or docker will create it as root:root
+	touch README.md
+	# now "update" the existing README.md
+	docker run \
+		--rm \
+		-u $(id -u):$(id -g) \
+		--volume "$(CURDIR):/terraform-docs" \
+		quay.io/terraform-docs/terraform-docs:0.17.0 \
+		markdown terraform-docs \
+		--config /terraform-docs/.config/terraform-docs.yml
 
 .PHONY: main full-test apply destroy unit-test clean aws-creds plan action docs

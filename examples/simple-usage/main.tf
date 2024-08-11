@@ -2,14 +2,14 @@
 # Data Resource
 ##############################################################################
 data "aws_partition" "primary" {
-  provider = aws.prototype_use1
+  provider = aws.test_aps1
 }
 
 data "aws_region" "current" {
-  provider = aws.prototype_use1
+  provider = aws.test_aps1
 }
 data "aws_caller_identity" "current" {
-  provider = aws.prototype_use1
+  provider = aws.test_aps1
 }
 
 resource "random_string" "sample" {
@@ -18,70 +18,52 @@ resource "random_string" "sample" {
   length  = 4
 }
 
-locals {
-  id          = random_string.sample.id
-  secret_name = "dev/spacelift-sumo/apiKeys"
+#############################################################################
+# Only Contains Data resource related to account. 
+##############################################################################
+data "aws_partition" "primary_test_aps1" {
+  provider = aws.test_aps1
 }
+
+data "aws_region" "current_test_aps1" {
+  provider = aws.test_aps1
+}
+data "aws_caller_identity" "current_test_aps1" {
+  provider = aws.test_aps1
+}
+data "aws_iam_role" "gateway" {
+  provider = aws.test_aps1
+  name     = "github-gateway"
+}
+
+locals {
+  test_aps1 = {
+    partition  = data.aws_partition.primary_test_aps1.partition
+    region     = data.aws_region.current_test_aps1.name
+    account_id = data.aws_caller_identity.current_test_aps1.account_id
+  }
+  test_aps1_function_names = [
+    "aws-controltower-NotificationForwarder",
+  ]
+}
+
 ## Prototype Development.
 module "target" {
-  source = "../../"
+  source = "../.."
   providers = {
-    aws.lambda_role    = aws.prototype_use1,
-    aws.ecr_repository = aws.prototype_use1,
+    aws.primary = aws.test_aps1,
   }
-  name            = "test-${local.id}"
-  github_monorepo = "infinitepi-io/infrastructure-support-lambdas"
-  ecr_creation    = true
-  custom_policy = {
-    LambdaAdditionalPolicy = jsonencode({
-      "Version" : "2012-10-17",
-      "Statement" : {
-        "Effect" : "Allow",
-        "Action" : [
-          "secretsmanager:GetSecretValue"
-        ]
-        "Resource" : [
-          "arn:aws:secretsmanager:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:secret:${local.secret_name}-??????"
-        ]
-      }
-    })
-  }
-}
-## Deploying the cross account lambda. lambda in prototypet and ECR repo in experiments_use1.
-module "target2" {
-  source = "../../"
-  providers = {
-    aws.lambda_role    = aws.prototype_use1,
-    aws.ecr_repository = aws.experiments_use1,
-  }
-  name            = "test-${local.id}"
-  github_monorepo = "infinitepi-io/infrastructure-support-lambdas"
-  # All the cross account access will be controlled from here. This shows how many account lambda is currently deployed.
-  account_ids = [
-    "988857891049",
-    #Add other accounts to allow lambda in other account to pull image.
-    # "474668255207"
-  ]
-  ecr_creation = true
-  custom_policy = {
-    LambdaAdditionalPolicy = jsonencode({
-      "Version" : "2012-10-17",
-      "Statement" : {
-        "Effect" : "Allow",
-        "Action" : [
-          "secretsmanager:GetSecretValue"
-        ]
-        "Resource" : [
-          "arn:aws:secretsmanager:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:secret:${local.secret_name}-??????"
-        ]
-      }
-    })
-  }
+  artifact_bucket_name = "infinitepi-io-sam-artifacts"
+  gateway_role_arn     = data.aws_iam_role.gateway.arn
+  functional_role      = "deploy-${random_string.sample.id}"
+  function_names       = local.test_aps1_function_names
+  partition            = local.test_aps1.partition
+  region               = local.test_aps1.region
+  account_id           = local.test_aps1.account_id
 }
 
 output "all" {
   value = {
-    target  = module.target,
-    target2 = module.target2,
+    target = module.target,
   }
 }

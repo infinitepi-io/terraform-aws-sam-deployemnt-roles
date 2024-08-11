@@ -1,40 +1,135 @@
-data "aws_region" "lambda_role" {
-  provider = aws.lambda_role
+#############################################################################
+# Cloudformation Templates Role required for SAM Deployment.
+##############################################################################
+resource "aws_iam_role" "deploy" {
+  provider = aws.primary
+  name     = var.functional_role
+  path     = "/"
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        "Effect" = "Allow",
+        "Principal" = {
+          "AWS" = var.gateway_role_arn
+        },
+        "Action" = [
+          "sts:AssumeRole",
+          "sts:TagSession"
+        ],
+      }
+    ]
+  })
+  tags = {
+    "OIDCRole" = var.gateway_role_arn
+  }
 }
-data "aws_caller_identity" "lambda_role" {
-  provider = aws.lambda_role
-}
-data "aws_partition" "lambda_role" {
-  provider = aws.lambda_role
-}
-data "aws_region" "ecr_repository" {
-  provider = aws.ecr_repository
-}
-data "aws_caller_identity" "ecr_repository" {
-  provider = aws.ecr_repository
-}
-data "aws_partition" "ecr_repository" {
-  provider = aws.ecr_repository
-}
-data "aws_organizations_organization" "primary" {
-  provider = aws.lambda_role
-}
+##TODO: Adding `CompanionStack` permissions but we need to figure out why this permission required for cross account deployment.
+resource "aws_iam_role_policy" "deploy" {
+  provider = aws.primary
+  name     = "LambdaDeploy"
+  role     = aws_iam_role.deploy.name
 
-locals {
-  aws_lambda_role = {
-    region     = data.aws_region.lambda_role.name
-    account_id = data.aws_caller_identity.lambda_role.account_id
-    dns_suffix = data.aws_partition.lambda_role.dns_suffix
-    partition  = data.aws_partition.lambda_role.partition
-  }
-  aws_ecr_repository = {
-    region     = data.aws_region.ecr_repository.name
-    account_id = data.aws_caller_identity.ecr_repository.account_id
-    dns_suffix = data.aws_partition.ecr_repository.dns_suffix
-    partition  = data.aws_partition.ecr_repository.partition
-  }
-  org_id = data.aws_organizations_organization.primary.id
-  allowed_function_arns = [
-    for account_id in var.account_ids : "arn:*:lambda:*:${account_id}:function:${var.name}"
-  ]
+  policy = jsonencode({
+    "Version" : "2012-10-17",
+    "Statement" : [
+      {
+        "Action" : "iam:PassRole",
+        "Effect" : "Allow",
+        "Resource" : "arn:${var.partition}:iam::${var.account_id}:role/sam-lambda_*",
+        "Sid" : "PassToLambdaRole"
+      },
+      {
+        "Action" : [
+          "cloudformation:CreateChangeSet",
+          "cloudformation:DeleteStack",
+          "cloudformation:DescribeChangeSet",
+          "cloudformation:DescribeStackEvents",
+          "cloudformation:DescribeStacks",
+          "cloudformation:ExecuteChangeSet",
+          "cloudformation:GetTemplate",
+          "cloudformation:GetTemplateSummary"
+        ],
+        "Effect" : "Allow",
+        "Resource" : [
+          for name in var.function_names : "arn:${var.partition}:cloudformation:${var.region}:${var.account_id}:stack/glg-${name}/*"
+        ],
+        "Sid" : "SamCloudFormation"
+      },
+      {
+        "Action" : [
+          "cloudformation:DescribeChangeSet",
+          "cloudformation:DescribeStackEvents",
+          "cloudformation:DescribeStacks"
+        ],
+        "Effect" : "Allow",
+        "Resource" : [
+          for name in var.function_names : "arn:${var.partition}:cloudformation:${var.region}:${var.account_id}:stack/glg-${name}-????????-CompanionStack/*"
+        ],
+        "Sid" : "SamCloudFormationCompanionStack"
+      },
+      {
+        "Action" : [
+          "cloudformation:CreateChangeSet"
+        ],
+        "Effect" : "Allow",
+        "Resource" : "arn:aws:cloudformation:us-east-1:aws:transform/Serverless-2016-10-31",
+        "Sid" : "AccessToMacro"
+      },
+      {
+        "Action" : [
+          "ecr:BatchCheckLayerAvailability",
+          "ecr:BatchDeleteImage",
+          "ecr:BatchGetImage",
+          "ecr:CompleteLayerUpload",
+          "ecr:GetAuthorizationToken",
+          "ecr:GetDownloadUrlForLayer",
+          "ecr:InitiateLayerUpload",
+          "ecr:PutImage",
+          "ecr:UploadLayerPart",
+          "ecr:GetRepositoryPolicy"
+        ],
+        "Effect" : "Allow",
+        "Resource" : "*",
+        "Sid" : "SamEcr"
+      },
+      {
+        "Action" : [
+          "s3:DeleteObject",
+          "s3:GetObject",
+          "s3:GetObjectVersion",
+          "s3:ListBucket",
+          "s3:PutObject"
+        ],
+        "Effect" : "Allow",
+        "Resource" : [
+          "arn:aws:s3:::${var.artifact_bucket_name}",
+          "arn:aws:s3:::${var.artifact_bucket_name}/*"
+        ],
+        "Sid" : "SamS3"
+      },
+      {
+        "Action" : [
+          "lambda:*"
+        ],
+        "Effect" : "Allow",
+        "Resource" : [
+          for name in var.function_names : "arn:${var.partition}:lambda:${var.region}:${var.account_id}:function:${name}"
+        ],
+        "Sid" : "CloudformationLambdaPermissions"
+      },
+      {
+        "Sid" : "CloudformationEC2Permissions",
+        "Effect" : "Allow",
+        "Action" : [
+          "ec2:DescribeSecurityGroups",
+          "ec2:DescribeSecurityGroupRules",
+          "ec2:DescribeTags",
+          "ec2:DescribeSubnets",
+          "ec2:DescribeVpcs",
+        ],
+        "Resource" : "*"
+      }
+    ]
+  })
 }
