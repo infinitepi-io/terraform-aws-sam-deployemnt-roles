@@ -23,7 +23,7 @@ variable "function_names" {
   }
 }
 variable "gateway_role_arn" {
-  type = string
+  type        = string
   description = "Gateway role to get into AWS."
   validation {
     condition     = can(regex("^arn:aws:iam::\\d{12}:role/.*", var.gateway_role_arn))
@@ -31,7 +31,7 @@ variable "gateway_role_arn" {
   }
 }
 variable "partition" {
-  type = string
+  type        = string
   description = "aws partition"
   validation {
     condition     = can(regex("aws|aws-cn", var.partition))
@@ -39,7 +39,7 @@ variable "partition" {
   }
 }
 variable "region" {
-  type = string
+  type        = string
   description = "aws region"
   validation {
     condition     = length(var.region) > 0
@@ -47,10 +47,18 @@ variable "region" {
   }
 }
 variable "account_id" {
-  type = string
+  type        = string
   description = "account id where lambda is deployed"
   validation {
     condition     = can(regex("^\\d{12}$", var.account_id))
     error_message = "'account_id' should be a number"
+  }
+}
+variable "github_org_name" {
+  type        = string
+  description = "github org name"
+  validation {
+    condition     = length(var.github_org_name) > 0
+    error_message = "github_org_name can't be empty"
   }
 }

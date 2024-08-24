@@ -52,7 +52,7 @@ resource "aws_iam_role_policy" "deploy" {
         ],
         "Effect" : "Allow",
         "Resource" : [
-          for name in var.function_names : "arn:${var.partition}:cloudformation:${var.region}:${var.account_id}:stack/glg-${name}/*"
+          for name in var.function_names : "arn:${var.partition}:cloudformation:${var.region}:${var.account_id}:stack/${var.github_org_name}-${name}/*"
         ],
         "Sid" : "SamCloudFormation"
       },
@@ -64,7 +64,7 @@ resource "aws_iam_role_policy" "deploy" {
         ],
         "Effect" : "Allow",
         "Resource" : [
-          for name in var.function_names : "arn:${var.partition}:cloudformation:${var.region}:${var.account_id}:stack/glg-${name}-????????-CompanionStack/*"
+          for name in var.function_names : "arn:${var.partition}:cloudformation:${var.region}:${var.account_id}:stack/${var.github_org_name}-${name}-????????-CompanionStack/*"
         ],
         "Sid" : "SamCloudFormationCompanionStack"
       },

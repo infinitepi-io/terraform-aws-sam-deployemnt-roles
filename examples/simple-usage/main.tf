@@ -60,6 +60,7 @@ module "target" {
   partition            = local.test_aps1.partition
   region               = local.test_aps1.region
   account_id           = local.test_aps1.account_id
+  github_org_name      = "infinitepi-io"
 }
 
 output "all" {
