@@ -56,6 +56,9 @@ resource "aws_iam_role_policy" "deploy" {
         ],
         "Sid" : "SamCloudFormation"
       },
+      # The AWS::Serverless-2016-10-31 transform is essentially an extension of CloudFormation that allows you to use a 
+      # shorthand syntax to define serverless resources. When you deploy a SAM template, 
+      # this transform expands the shorthand syntax into full CloudFormation syntax before deploying the resources.
       {
         "Action" : "cloudformation:CreateChangeSet"
         "Effect" : "Allow"
