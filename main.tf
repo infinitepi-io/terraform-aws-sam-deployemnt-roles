@@ -57,6 +57,11 @@ resource "aws_iam_role_policy" "deploy" {
         "Sid" : "SamCloudFormation"
       },
       {
+        "Action" : "cloudformation:CreateChangeSet"
+        "Effect" : "Allow"
+        "Resource" : "arn:${var.partition}:cloudformation:${var.region}:aws:transform/Serverless-2016-10-31"
+      },
+      {
         "Action" : [
           "cloudformation:DescribeChangeSet",
           "cloudformation:DescribeStackEvents",
